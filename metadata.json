@@ -1,0 +1,6 @@
+{
+  "name": "DamBreak 3D",
+  "description": "Hydrodynamic Dam Failure & Flood Inundation Decision Support Platform for Indian terrain with 2D/3D simulation, impact analysis, and evacuation routing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
