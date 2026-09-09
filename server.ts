@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import { spawn } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { INDIAN_DAMS } from './src/data/indianDams.js';
 import { NAGARJUNA_SAGAR_DEM } from './src/data/nagarjunaSagarDEM.js';
@@ -10,9 +11,38 @@ import {
 } from './src/data/nagarjunaSagarInfrastructure.js';
 import {
   runHydrodynamicSimulation,
-  HydrodynamicSimulationResult,
 } from './src/simulation/hydrodynamicEngine.js';
-import { BreachParameters } from './src/types/index.js';
+import { BreachParameters, HydrodynamicSimulationResult } from './src/types/index.js';
+
+const ANUGA_BACKEND_URL = process.env.ANUGA_BACKEND_URL || 'http://127.0.0.1:8000';
+
+async function ensureAnugaBackendLive() {
+  try {
+    const res = await fetch(`${ANUGA_BACKEND_URL}/api/health`, { signal: AbortSignal.timeout(1500) });
+    if (res.ok) {
+      console.log(`[ANUGA] Live backend detected on ${ANUGA_BACKEND_URL}`);
+      return;
+    }
+  } catch {}
+
+  console.log(`[ANUGA] Backend offline. Launching ANUGA FastAPI solver...`);
+  const pythonPath = path.join(process.cwd(), 'backend', 'venv', 'bin', 'python');
+  const backendDir = path.join(process.cwd(), 'backend');
+
+  try {
+    const proc = spawn(pythonPath, ['-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8000', '--log-level', 'info'], {
+      cwd: backendDir,
+      stdio: 'inherit',
+      detached: false,
+    });
+
+    proc.on('error', (err) => {
+      console.warn(`[ANUGA] Auto-spawn warning:`, err.message);
+    });
+  } catch (err) {
+    console.warn(`[ANUGA] Could not auto-spawn backend:`, err);
+  }
+}
 
 // In-memory simulation jobs store
 const simulationsStore = new Map<string, {
@@ -38,8 +68,7 @@ const defaultParams: BreachParameters = {
 const initialResult = runHydrodynamicSimulation(
   NAGARJUNA_SAGAR_DEM,
   defaultParams,
-  NAGARJUNA_INFRASTRUCTURE,
-  false
+  NAGARJUNA_INFRASTRUCTURE
 );
 
 const defaultSimId = 'sim-nagarjuna-major-breach';
@@ -53,12 +82,51 @@ simulationsStore.set(defaultSimId, {
 });
 
 async function startServer() {
+  await ensureAnugaBackendLive();
+
   const app = express();
   const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
 
-  // API Routes
+  // Live ANUGA Reverse Proxy Middleware: forward all /api requests to port 8000
+  app.use('/api', async (req, res, next) => {
+    try {
+      const targetUrl = `${ANUGA_BACKEND_URL}/api${req.url}`;
+      const headers: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.headers)) {
+        const lk = k.toLowerCase();
+        if (lk !== 'host' && lk !== 'content-length' && lk !== 'connection' && typeof v === 'string') {
+          headers[k] = v;
+        }
+      }
+      const fetchOpts: RequestInit = {
+        method: req.method,
+        headers,
+      };
+      if (req.method !== 'GET' && req.method !== 'HEAD' && req.body && Object.keys(req.body).length > 0) {
+        fetchOpts.body = JSON.stringify(req.body);
+        headers['content-type'] = 'application/json';
+      }
+
+      const backendRes = await fetch(targetUrl, fetchOpts);
+      if (backendRes.status !== 404) {
+        res.status(backendRes.status);
+        backendRes.headers.forEach((val, key) => {
+          if (key !== 'transfer-encoding' && key !== 'content-encoding') {
+            res.setHeader(key, val);
+          }
+        });
+        const text = await backendRes.text();
+        return res.send(text);
+      }
+    } catch {
+      // ANUGA backend unreachable, fall through to Express fallback handlers
+    }
+    next();
+  });
+
+  // API Routes (Fallback)
   app.get('/api/health', (req, res) => {
     res.json({
       status: 'ok',
@@ -145,8 +213,7 @@ async function startServer() {
         const result = runHydrodynamicSimulation(
           NAGARJUNA_SAGAR_DEM,
           params,
-          NAGARJUNA_INFRASTRUCTURE,
-          is_demo ?? false
+          NAGARJUNA_INFRASTRUCTURE
         );
         result.metadata.id = simId;
         job.status = 'COMPLETED';
@@ -250,19 +317,15 @@ async function startServer() {
     res.json({ routes });
   });
 
-  app.post('/api/admin/upload', (req, res) => {
-    const { dataset_type, file_name, file_size } = req.body;
-    res.json({
-      success: true,
-      message: `Dataset '${file_name}' (${dataset_type}) received and registered for local processing.`,
-      timestamp: new Date().toISOString(),
-    });
-  });
-
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        watch: {
+          ignored: ['**/data/**', '**/backend/**', '**/dist/**', '**/*.sww', '**/*.tif'],
+        },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

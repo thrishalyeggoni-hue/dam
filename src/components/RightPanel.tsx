@@ -1,118 +1,144 @@
 import React from 'react';
 import {
   Activity,
-  Droplet,
-  Gauge,
-  MapPin,
-  Clock,
-  ShieldCheck,
-  AlertTriangle,
-  Building2,
-  Maximize2,
   Crosshair,
+  MapPin,
+  AlertCircle,
+  Clock,
+  Gauge,
+  Layers,
+  Wind,
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   SimulationFrame,
   SimulationMetadata,
   ImpactStatistics,
   HydrodynamicGridPoint,
+  InfrastructureFeature,
 } from '../types';
 
 interface RightPanelProps {
   currentFrame?: SimulationFrame;
+  frames?: SimulationFrame[];
   metadata?: SimulationMetadata;
   impactSummary?: ImpactStatistics;
+  infrastructure?: InfrastructureFeature[];
   selectedPoint: HydrodynamicGridPoint | null;
   onClearPoint: () => void;
 }
 
 export const RightPanel: React.FC<RightPanelProps> = ({
   currentFrame,
+  frames = [],
   metadata,
   impactSummary,
+  infrastructure = [],
   selectedPoint,
   onClearPoint,
 }) => {
+  // Peak discharge for scaling hydrograph bars
+  const peakQ = metadata?.peak_discharge_m3s || 41200;
+
+  // Filter top critical infrastructure for dynamic alerts
+  const criticalAssets = infrastructure
+    .filter((f) => f.type !== 'shelter')
+    .sort((a, b) => (b.water_depth_m || 0) - (a.water_depth_m || 0))
+    .slice(0, 3);
+
   return (
-    <aside className="w-80 md:w-96 border-l border-white/5 bg-[#0a0a0c] p-4 flex flex-col gap-5 z-20 overflow-y-auto text-[#e0e0e0] shrink-0 shadow-2xl">
+    <aside className="w-80 md:w-96 border-l border-slate-200 bg-white p-4 flex flex-col gap-5 z-20 overflow-y-auto text-slate-800 shrink-0 shadow-sm">
       {/* Header */}
-      <div className="flex justify-between items-center pb-3 border-b border-white/5">
+      <div className="flex justify-between items-center pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-blue-400" />
-          <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">
-            Telemetry Stream
+          <Activity className="w-4 h-4 text-blue-600" />
+          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+            Real-Time Telemetry
           </span>
         </div>
-        <span className="text-[9px] font-mono text-emerald-400 animate-pulse flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          LIVE_FEED ({currentFrame?.time_formatted || '00:00'})
+        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 font-bold">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          {currentFrame?.time_formatted || 'T+00:00'}
         </span>
       </div>
 
-      {/* Main Discharge & Wave Telemetry */}
-      <div>
-        <div className="bg-white/5 p-3.5 rounded border border-white/10 space-y-3">
-          <div>
-            <div className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">
-              Current Breach Discharge (Q_t)
-            </div>
-            <div className="text-2xl font-mono font-bold text-blue-400 tracking-tight mt-0.5">
-              {currentFrame?.discharge_m3s.toLocaleString() || '0'}{' '}
-              <span className="text-xs font-normal text-white/60 font-sans">m³/s</span>
+      {/* Main Metric: Instantaneous Outflow Discharge */}
+      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 shadow-xs">
+        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">
+          Current Outflow Discharge (Q_t)
+        </span>
+        <div className="flex items-baseline gap-2 my-1">
+          <span className="text-3xl font-mono font-extrabold text-blue-600 tracking-tight">
+            {currentFrame?.discharge_m3s.toLocaleString() || '0'}
+          </span>
+          <span className="text-xs font-mono text-slate-500 font-medium">m³/s</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-200/60 text-xs">
+          <div className="bg-white p-2 rounded border border-slate-200/60">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Peak Outflow</div>
+            <div className="text-xs font-mono font-bold text-amber-700">
+              {metadata?.peak_discharge_m3s.toLocaleString() || '0'} m³/s
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-white/5 text-xs">
-            <div className="bg-white/5 p-2 rounded">
-              <div className="text-[9px] uppercase tracking-wider text-white/40">Peak Outflow</div>
-              <div className="text-xs font-mono font-semibold text-amber-300">
-                {metadata?.peak_discharge_m3s.toLocaleString() || '0'} m³/s
-              </div>
+
+          <div className="bg-white p-2 rounded border border-slate-200/60">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Flooded Area</div>
+            <div className="text-xs font-mono font-bold text-blue-600">
+              {(currentFrame?.flooded_area_sqkm ?? 0).toFixed(1)} km²
             </div>
-            <div className="bg-white/5 p-2 rounded">
-              <div className="text-[9px] uppercase tracking-wider text-white/40">Inundated Area</div>
-              <div className="text-xs font-mono font-semibold text-cyan-400">
-                {currentFrame?.flooded_area_sqkm.toFixed(1) || '0.0'} km²
-              </div>
+          </div>
+
+          <div className="bg-white p-2 rounded border border-slate-200/60">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Max Stage Depth</div>
+            <div className="text-xs font-mono font-bold text-slate-800">
+              {(currentFrame?.max_depth_m ?? 0).toFixed(1)} m
             </div>
-            <div className="bg-white/5 p-2 rounded">
-              <div className="text-[9px] uppercase tracking-wider text-white/40">Peak Stage Depth</div>
-              <div className="text-xs font-mono font-semibold text-blue-300">
-                {currentFrame?.max_depth_m.toFixed(1) || '0.0'} m
-              </div>
-            </div>
-            <div className="bg-white/5 p-2 rounded">
-              <div className="text-[9px] uppercase tracking-wider text-white/40">Max Wave Velocity</div>
-              <div className="text-xs font-mono font-semibold text-rose-400">
-                {currentFrame?.max_velocity_ms.toFixed(1) || '0.0'} m/s
-              </div>
+          </div>
+
+          <div className="bg-white p-2 rounded border border-slate-200/60">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Max Wave Speed</div>
+            <div className="text-xs font-mono font-bold text-rose-700">
+              {(currentFrame?.max_velocity_ms ?? 0).toFixed(1)} m/s
             </div>
           </div>
         </div>
       </div>
 
-      {/* Hydrograph (m³/s vs hr) Mini Visualizer */}
+      {/* Dynamic Hydrograph (m³/s vs time) */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">
-            Hydrograph (m³/s vs hr)
+          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+            Discharge Hydrograph Curve
           </span>
-          <span className="text-[9px] font-mono text-white/30">T_peak: 30m</span>
+          <span className="text-[10px] font-mono text-slate-500">
+            Peak: {peakQ.toLocaleString()} m³/s
+          </span>
         </div>
-        <div className="h-28 bg-white/5 rounded border border-white/10 flex items-end p-2.5 gap-1.5 relative overflow-hidden">
-          {[22, 45, 78, 100, 82, 60, 42, 28, 18, 12, 8, 6].map((pct, idx) => (
-            <div
-              key={idx}
-              className={`flex-1 rounded-t transition-all ${
-                idx === 3
-                  ? 'bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.7)]'
-                  : 'bg-blue-600/30 hover:bg-blue-500/50'
-              }`}
-              style={{ height: `${pct}%` }}
-              title={`T+${idx * 15}m: ~${Math.round((pct / 100) * (metadata?.peak_discharge_m3s || 142000))} m³/s`}
-            />
-          ))}
-          <div className="absolute top-2 right-2 text-[9px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/30">
-            FROEHLICH FIT
+
+        <div className="h-28 bg-slate-50 rounded-lg border border-slate-200/80 flex items-end p-2.5 gap-1 relative overflow-hidden">
+          {(frames.length > 0 ? frames : Array(13).fill(null)).map((f, idx) => {
+            const discharge = f ? f.discharge_m3s : 1000;
+            const heightPercent = Math.min(100, Math.max(8, (discharge / peakQ) * 100));
+            const isCurrent = f && currentFrame && f.time_seconds === currentFrame.time_seconds;
+
+            return (
+              <div
+                key={idx}
+                className={`flex-1 rounded-t transition-all ${isCurrent
+                    ? 'bg-blue-600 shadow-md ring-2 ring-blue-300'
+                    : 'bg-blue-300 hover:bg-blue-400'
+                  }`}
+                style={{ height: `${heightPercent}%` }}
+                title={f ? `${f.time_formatted}: ${f.discharge_m3s.toLocaleString()} m³/s` : `Frame ${idx}`}
+              />
+            );
+          })}
+
+          <div className="absolute top-2 right-2 text-[10px] font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 font-medium">
+            2D SWE SOLVER
           </div>
         </div>
       </div>
@@ -121,117 +147,192 @@ export const RightPanel: React.FC<RightPanelProps> = ({
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
-            <Crosshair className="w-3.5 h-3.5 text-blue-400" />
-            <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">
+            <Crosshair className="w-3.5 h-3.5 text-blue-600" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
               Point Inspection Probe
             </span>
           </div>
           {selectedPoint && (
             <button
               onClick={onClearPoint}
-              className="text-[10px] text-blue-400 hover:text-blue-300 font-mono transition-colors"
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
             >
               Reset
             </button>
           )}
         </div>
 
-        <div className="bg-white/5 p-3 rounded border border-white/10">
+        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 text-xs space-y-2">
           {selectedPoint ? (
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/40 text-[11px]">Coordinates</span>
-                <span className="font-mono text-white/90">
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Coordinates</span>
+                <span className="font-mono text-slate-800 font-medium">
                   {selectedPoint.lat.toFixed(4)}°N, {selectedPoint.lon.toFixed(4)}°E
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/40 text-[11px]">Ground Elevation</span>
-                <span className="font-mono text-white/90">
-                  {selectedPoint.elevation.toFixed(1)} m MSL
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Ground Elevation</span>
+                <span className="font-mono text-slate-800 font-medium">
+                  {(
+                    (selectedPoint as unknown as Record<string, unknown>).elevation_m ??
+                    selectedPoint.elevation ??
+                    0
+                  ) as number} m MSL
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/40 text-[11px]">Water Depth</span>
-                <span className="font-mono font-bold text-blue-400">
-                  {selectedPoint.depth > 0 ? `${selectedPoint.depth.toFixed(2)} m` : 'Dry (0.0 m)'}
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Water Stage</span>
+                <span className="font-mono text-slate-800 font-medium">
+                  {(
+                    (selectedPoint as unknown as Record<string, unknown>).water_surface_elevation_m ??
+                    selectedPoint.water_surface_elev ??
+                    0
+                  ) as number} m MSL
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/40 text-[11px]">Flow Velocity</span>
-                <span className="font-mono font-bold text-amber-400">
-                  {selectedPoint.velocity_mag > 0 ? `${selectedPoint.velocity_mag.toFixed(2)} m/s` : '0.0 m/s'}
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Water Depth (Stage - Bed)</span>
+                <span className="font-mono font-bold text-blue-600">
+                  {Number(
+                    (selectedPoint as unknown as Record<string, unknown>).water_depth_m ??
+                    selectedPoint.depth ??
+                    0
+                  ) > 0
+                    ? `${Number(
+                      (selectedPoint as unknown as Record<string, unknown>).water_depth_m ??
+                      selectedPoint.depth
+                    ).toFixed(2)} m`
+                    : 'Dry (0.0 m)'}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/40 text-[11px]">Flood Arrival Time</span>
-                <span className="font-mono font-bold text-emerald-400">
-                  {selectedPoint.arrival_time_min >= 0
-                    ? `${selectedPoint.arrival_time_min} min (${(selectedPoint.arrival_time_min / 60).toFixed(1)}h)`
-                    : 'Not reached yet'}
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Flow Velocity</span>
+                <span className="font-mono font-bold text-amber-700">
+                  {Number(
+                    (selectedPoint as unknown as Record<string, unknown>).flow_velocity_ms ??
+                    selectedPoint.velocity_mag ??
+                    0
+                  ) > 0
+                    ? `${Number(
+                      (selectedPoint as unknown as Record<string, unknown>).flow_velocity_ms ??
+                      selectedPoint.velocity_mag
+                    ).toFixed(2)} m/s`
+                    : '0.0 m/s'}
                 </span>
               </div>
-              <div className="flex justify-between items-center pt-1">
-                <span className="text-white/40 text-[11px]">Hazard Tier</span>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Flood Arrival Time</span>
+                <span className="font-mono text-slate-700 font-medium">
+                  {selectedPoint.arrival_time_min !== null &&
+                    selectedPoint.arrival_time_min !== undefined &&
+                    selectedPoint.arrival_time_min >= 0
+                    ? `T+${Number(selectedPoint.arrival_time_min).toFixed(1)}m`
+                    : 'Safe (Not Reached)'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
+                <span className="text-slate-500">Hazard Tier</span>
                 <span
-                  className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded ${
-                    selectedPoint.risk_level === 'VERY_HIGH'
-                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${selectedPoint.risk_level === 'VERY_HIGH'
+                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
                       : selectedPoint.risk_level === 'HIGH'
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      : selectedPoint.risk_level === 'MODERATE'
-                      ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  }`}
+                        ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                        : selectedPoint.risk_level === 'MODERATE'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    }`}
                 >
-                  {selectedPoint.risk_level} HAZARD
+                  {selectedPoint.risk_level} RISK
                 </span>
               </div>
             </div>
           ) : (
-            <div className="py-3 text-center text-white/40 text-xs">
-              <MapPin className="w-4 h-4 mx-auto mb-1 text-white/30" />
-              <p className="text-[11px]">Click anywhere on 3D terrain or 2D map to inspect hydraulic values.</p>
+            <div className="py-4 text-center text-slate-500 text-xs">
+              <MapPin className="w-5 h-5 mx-auto mb-1 text-slate-400" />
+              <p className="font-medium text-slate-600">Click any location on the map</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Inspects local water depth, velocity, and arrival time.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Immediate Impact Zone */}
+      {/* DYNAMIC Downstream Risk Exposure Alerts (Specific to Active Dam) */}
       <div>
-        <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold block mb-2">
-          Immediate Impact Zone
+        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-2">
+          Downstream Settlement Alerts
         </span>
         <div className="space-y-2">
-          <div className="p-2.5 rounded bg-white/5 border-l-2 border-red-500 text-xs flex justify-between items-center">
-            <div>
-              <div className="font-medium text-white">Nagarjuna Sagar Colony</div>
-              <div className="text-[10px] text-white/40">ETA: 18m | Depth: 6.8m</div>
-            </div>
-            <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-mono font-bold">
-              CRITICAL
-            </span>
-          </div>
+          {infrastructure.length > 0 ? (
+            infrastructure
+              .filter((f) => f.type === 'village' || f.type === 'hospital' || f.type === 'bridge')
+              .slice(0, 5)
+              .map((asset) => {
+                const status =
+                  (asset as unknown as Record<string, unknown>).evacuation_status as string ||
+                  ((asset.water_depth_m || 0) > 2.0
+                    ? 'EVACUATE'
+                    : (asset.water_depth_m || 0) > 0.05
+                      ? 'ALERT'
+                      : 'NOT REACHED');
+                const isOutside = status === 'OUTSIDE MODEL DOMAIN';
+                const isNotReached = status === 'NOT REACHED';
+                const isEvac = status === 'EVACUATE';
+                const isPrepare = status === 'PREPARE' || status === 'ALERT';
+                const cellId = (asset as unknown as Record<string, unknown>).solver_cell_id;
 
-          <div className="p-2.5 rounded bg-white/5 border-l-2 border-red-500 text-xs flex justify-between items-center">
-            <div>
-              <div className="font-medium text-white">Macherla Lowlands</div>
-              <div className="text-[10px] text-white/40">ETA: 45m | Depth: 4.2m</div>
+                return (
+                  <div
+                    key={asset.id}
+                    className={`p-2.5 rounded-lg border text-xs flex justify-between items-center ${isOutside
+                        ? 'bg-slate-50 border-slate-200 text-slate-600'
+                        : isEvac
+                          ? 'bg-red-50 border-red-200 text-red-950'
+                          : isPrepare
+                            ? 'bg-amber-50 border-amber-200 text-amber-950'
+                            : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                      }`}
+                  >
+                    <div>
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>{asset.name}</span>
+                        {cellId !== undefined && cellId !== null && (
+                          <span className="text-[9px] font-mono text-slate-400 font-normal">
+                            [Cell #{String(cellId)}]
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] opacity-85">
+                        {isOutside ? (
+                          'OUTSIDE MODEL DOMAIN'
+                        ) : isNotReached ? (
+                          `Ground: ${asset.elevation_m}m MSL | Dry (Not Reached)`
+                        ) : (
+                          `ETA: T+${asset.arrival_time_min ?? 0}m | Depth: ${(asset.water_depth_m || 0).toFixed(1)}m | Vel: ${(asset.max_velocity_ms || 0).toFixed(1)}m/s`
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[10px] text-white px-2 py-0.5 rounded font-bold font-mono shrink-0 ${isOutside
+                          ? 'bg-slate-500'
+                          : isEvac
+                            ? 'bg-red-600'
+                            : isPrepare
+                              ? 'bg-amber-600'
+                              : 'bg-emerald-600'
+                        }`}
+                    >
+                      {status}
+                    </span>
+                  </div>
+                );
+              })
+          ) : (
+            <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>All monitored downstream reaches currently within safe non-flood stage.</span>
             </div>
-            <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-mono font-bold">
-              HIGH RISK
-            </span>
-          </div>
-
-          <div className="p-2.5 rounded bg-white/5 border-l-2 border-amber-500 text-xs flex justify-between items-center">
-            <div>
-              <div className="font-medium text-white">NH-565 Krishna Bridge</div>
-              <div className="text-[10px] text-white/40">ETA: 35m | Submerged 3.1m</div>
-            </div>
-            <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-mono font-bold">
-              SEVERED
-            </span>
-          </div>
+          )}
         </div>
       </div>
     </aside>

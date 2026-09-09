@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { runHydrodynamicSimulation } from './simulation/hydrodynamicEngine';
 import { Navbar, ActiveTab } from './components/Navbar';
 import { LeftPanel } from './components/LeftPanel';
 import { RightPanel } from './components/RightPanel';
@@ -11,57 +12,74 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ImpactAnalysisPage } from './pages/ImpactAnalysisPage';
 import { ScenarioComparisonPage } from './pages/ScenarioComparisonPage';
 import { EvacuationPage } from './pages/EvacuationPage';
-import { CinematicViewPage } from './pages/CinematicViewPage';
-import { AdminDataPage } from './pages/AdminDataPage';
+import { AIFlowControlModal } from './components/AIFlowControlModal';
+import { DemoModeBanner } from './components/DemoModeBanner';
+import { ScientificDebugPanel } from './components/ScientificDebugPanel';
+import { HydraulicLayerMode } from './utils/hydraulicScale';
 
 import { INDIAN_DAMS } from './data/indianDams';
-import { NAGARJUNA_SAGAR_DEM } from './data/nagarjunaSagarDEM';
 import {
-  NAGARJUNA_INFRASTRUCTURE,
-  NAGARJUNA_EVACUATION_ROUTES,
-  KRISHNA_RIVER_CHANNEL,
-} from './data/nagarjunaSagarInfrastructure';
-import { runHydrodynamicSimulation } from './simulation/hydrodynamicEngine';
+  getDamDEM,
+  DAM_RIVER_CHANNELS,
+  DAM_INFRASTRUCTURE,
+  DAM_EVACUATION_ROUTES,
+  getDefaultBreachParameters,
+} from './data/damsRegistry';
+import {
+  startSimulation,
+  fetchSimulationStatus,
+  fetchSimulationResult,
+} from './services/api';
 import {
   IndianDam,
   BreachParameters,
   HydrodynamicGridPoint,
-  SimulationFrame,
-  SimulationMetadata,
-  ImpactStatistics,
 } from './types';
 
 export default function App() {
   // Navigation & View Mode
   const [activeTab, setActiveTab] = useState<ActiveTab>('simulation');
-  const [viewMode, setViewMode] = useState<'2D' | '3D'>('3D');
+  const [viewMode, setViewMode] = useState<'2D' | '3D'>('2D');
 
   // Selected Dam
   const [selectedDam, setSelectedDam] = useState<IndianDam>(INDIAN_DAMS[0]);
 
-  // Breach Scenario Parameters
-  const [parameters, setParameters] = useState<BreachParameters>({
-    reservoir_water_level_m: 179.8,
-    initial_water_depth_m: 124.0,
-    breach_width_m: 60,
-    breach_height_m: 55,
-    breach_formation_time_min: 45,
-    breach_location: 'center',
-    failure_type: 'major',
-    manning_n: 0.035,
-  });
+  // AI Flow Control Modal
+  const [isAIAdvisorOpen, setIsAIAdvisorOpen] = useState(false);
 
-  // Simulation Running State
+  // Active Dam Geospatial Assets
+  const activeDEM = useMemo(() => getDamDEM(selectedDam), [selectedDam]);
+  const activeRiverChannel: [number, number][] = useMemo(
+    () => (DAM_RIVER_CHANNELS[selectedDam.id] || [[selectedDam.latitude, selectedDam.longitude]]) as [number, number][],
+    [selectedDam.id]
+  );
+  const activeInfrastructure = useMemo(
+    () => DAM_INFRASTRUCTURE[selectedDam.id] || [],
+    [selectedDam.id]
+  );
+  const activeEvacuationRoutes = useMemo(
+    () => DAM_EVACUATION_ROUTES[selectedDam.id] || [],
+    [selectedDam.id]
+  );
+
+  // Breach Parameters
+  const [parameters, setParameters] = useState<BreachParameters>(() =>
+    getDefaultBreachParameters(INDIAN_DAMS[0])
+  );
+
+  // Simulation State
   const [isSimulating, setIsSimulating] = useState(false);
-  const [simulationStage, setSimulationStage] = useState('Ready');
+  const [simulationStage, setSimulationStage] = useState('Ready — start the ANUGA backend for real physics');
   const [simulationProgress, setSimulationProgress] = useState(0);
+  const [isDemoMode, setIsDemoMode] = useState(true); // assume demo until proven otherwise
+  const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | undefined>(undefined);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Layer Visibilities
   const [layers, setLayers] = useState<LayerVisibility>({
     terrain: true,
-    satellite: true,
     dam_model: true,
-    reservoir: true,
     river_channel: true,
     flood_extent: true,
     water_depth: true,
@@ -69,7 +87,6 @@ export default function App() {
     arrival_time: true,
     risk_zones: true,
     roads: true,
-    buildings: true,
     villages: true,
     hospitals: true,
     schools: true,
@@ -80,81 +97,184 @@ export default function App() {
     setLayers((prev) => ({ ...prev, [layerKey]: !prev[layerKey] }));
   }, []);
 
-  // Compute Initial Hydrodynamic Simulation Data
+  // Initial simulation result — use legacy engine for initial render
+  // (isDemoMode=true until real backend result arrives)
+
   const [simResult, setSimResult] = useState(() =>
-    runHydrodynamicSimulation(
-      NAGARJUNA_SAGAR_DEM,
-      {
-        reservoir_water_level_m: 179.8,
-        initial_water_depth_m: 124.0,
-        breach_width_m: 60,
-        breach_height_m: 55,
-        breach_formation_time_min: 45,
-        breach_location: 'center',
-        failure_type: 'major',
-        manning_n: 0.035,
-      },
-      NAGARJUNA_INFRASTRUCTURE
-    )
+    runHydrodynamicSimulation(activeDEM, parameters, activeInfrastructure)
   );
 
+  // Handle dam selection change
+  const handleSelectDam = (newDam: IndianDam) => {
+    setSelectedDam(newDam);
+    const newDEM = getDamDEM(newDam);
+    const newParams = getDefaultBreachParameters(newDam);
+    const newInfra = DAM_INFRASTRUCTURE[newDam.id] || [];
+    setParameters(newParams);
+    const newResult = runHydrodynamicSimulation(newDEM, newParams, newInfra);
+    setSimResult(newResult);
+    setCurrentFrameIndex(3);
+    setSelectedPoint(null);
+    setIsDemoMode(true);
+  };
+
   // Timeline State
-  const [currentFrameIndex, setCurrentFrameIndex] = useState(4); // Start at T+01:00 for good flood visualization
+  const [currentFrameIndex, setCurrentFrameIndex] = useState(4);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
   // Inspection Probe Point
   const [selectedPoint, setSelectedPoint] = useState<HydrodynamicGridPoint | null>(null);
 
-  // Trigger New Simulation Run
-  const handleRunSimulation = async () => {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        setShowDebugPanel(v => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // ── Auto-load Live ANUGA baseline simulation on mount ───────────── //
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLiveBaseline() {
+      try {
+        const status = await fetchSimulationStatus('default');
+        if (status.status === 'COMPLETED' && !cancelled) {
+          const result = await fetchSimulationResult('default', activeDEM, parameters, activeInfrastructure);
+          if (!cancelled && !result.is_demo) {
+            setSimResult(result as typeof simResult);
+            setIsDemoMode(false);
+            setDiagnostics(result.diagnostics);
+            setSimulationStage('✓ ANUGA 2D SWE live solver active');
+          }
+        }
+      } catch {
+        // Live server still starting or offline; initial state remains
+      }
+    }
+    loadLiveBaseline();
+    return () => { cancelled = true; };
+  }, [activeDEM, parameters, activeInfrastructure]);
+
+  // Hydraulic Layer Filter Mode (shared by 2D, 3D, and Legend)
+  const [activeHydraulicLayer, setActiveHydraulicLayer] = useState<HydraulicLayerMode>('depth');
+
+  // ── Trigger New Simulation Run ──────────────────────────────────── //
+  const handleRunSimulation = async (overrideParams?: BreachParameters) => {
+    const runParams = overrideParams || parameters;
     setIsSimulating(true);
-    setSimulationStage('Initializing DEM Topography & Boundary Cells...');
-    setSimulationProgress(15);
+    setSimulationStage('Connecting to ANUGA backend...');
+    setSimulationProgress(5);
 
-    await new Promise((r) => setTimeout(r, 400));
-    setSimulationStage('Calculating Froehlich Peak Outflow & Breach Hydrograph...');
-    setSimulationProgress(40);
+    if (pollingRef.current) clearInterval(pollingRef.current);
 
-    await new Promise((r) => setTimeout(r, 500));
-    setSimulationStage('Solving 2D Shallow Water Equations (SWE Continuity & Momentum)...');
-    setSimulationProgress(75);
+    try {
+      // 1. Start simulation on backend (or get demo ID if offline)
+      const startResult = await startSimulation(selectedDam.id, runParams);
 
-    await new Promise((r) => setTimeout(r, 500));
-    setSimulationStage('Intersecting Inundation Envelopes with Downstream Infrastructure...');
-    setSimulationProgress(95);
+      if (startResult.is_demo) {
+        // Backend offline — use legacy engine immediately
+        setSimulationStage('⚠️ DEMO MODE — ANUGA backend offline');
+        setSimulationProgress(50);
+        const result = runHydrodynamicSimulation(activeDEM, runParams, activeInfrastructure);
+        setSimResult({ ...result, is_demo: true } as typeof simResult);
+        setIsDemoMode(true);
+        setCurrentFrameIndex(3);
+        setIsSimulating(false);
+        setSimulationProgress(100);
+        setIsPlaying(true);
+        return;
+      }
 
-    await new Promise((r) => setTimeout(r, 300));
-    const result = runHydrodynamicSimulation(NAGARJUNA_SAGAR_DEM, parameters, NAGARJUNA_INFRASTRUCTURE);
-    setSimResult(result);
-    setCurrentFrameIndex(2);
-    setIsSimulating(false);
-    setSimulationStage('Simulation Completed');
-    setSimulationProgress(100);
-    setIsPlaying(true);
+      // 2. Poll status until COMPLETED
+      const simId = startResult.simulation_id;
+      setSimulationStage('Preprocessing DEM and meshing domain...');
+      setSimulationProgress(15);
+      setIsDemoMode(false);
+
+      await new Promise<void>((resolve, reject) => {
+        pollingRef.current = setInterval(async () => {
+          try {
+            const status = await fetchSimulationStatus(simId);
+            setSimulationStage(status.current_stage);
+            setSimulationProgress(status.progress_percent);
+
+            if (status.status === 'COMPLETED') {
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              resolve();
+            } else if (status.status === 'FAILED') {
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              reject(new Error(status.current_stage));
+            }
+          } catch (err) {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            reject(err);
+          }
+        }, 1500);
+      });
+
+      // 3. Fetch all results
+      setSimulationStage('Loading simulation frames...');
+      setSimulationProgress(88);
+      const result = await fetchSimulationResult(
+        simId, activeDEM, runParams, activeInfrastructure
+      );
+      setSimResult(result as typeof simResult);
+      setIsDemoMode(result.is_demo);
+      setDiagnostics(result.diagnostics);
+      setCurrentFrameIndex(0);
+      setIsSimulating(false);
+      setSimulationStage(result.is_demo
+        ? '⚠️ DEMO DATA — not from ANUGA solver'
+        : '✓ ANUGA simulation complete');
+      setSimulationProgress(100);
+      setIsPlaying(true);
+
+    } catch (err) {
+      console.error('Simulation failed:', err);
+      // Fallback to demo
+      const result = runHydrodynamicSimulation(activeDEM, runParams, activeInfrastructure);
+      setSimResult({ ...result, is_demo: true } as typeof simResult);
+      setIsDemoMode(true);
+      setSimulationStage(`⚠️ DEMO (error: ${err instanceof Error ? err.message : String(err)})`);
+      setSimulationProgress(100);
+      setIsSimulating(false);
+      setIsPlaying(true);
+    }
   };
 
   const currentFrame = simResult.frames[currentFrameIndex] || simResult.frames[0];
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#0a0a0c] text-[#e0e0e0] overflow-hidden font-sans">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-100 font-sans select-none text-slate-800">
+      {/* Demo Mode Banner — shown whenever backend offline or DEM synthetic */}
+      {isDemoMode && <DemoModeBanner diagnostics={diagnostics} />}
+
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        onSelectTab={setActiveTab}
         viewMode={viewMode}
         setViewMode={setViewMode}
+        onToggleViewMode={() => setViewMode((v) => (v === '2D' ? '3D' : '2D'))}
         dams={INDIAN_DAMS}
         selectedDam={selectedDam}
-        onSelectDam={(dam) => setSelectedDam(dam)}
+        onSelectDam={handleSelectDam}
         isSimulating={isSimulating}
+        onOpenAIAdvisor={() => setIsAIAdvisorOpen(true)}
+        onToggleDebug={() => setShowDebugPanel((v) => !v)}
+        isDebugOpen={showDebugPanel}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden relative">
         {activeTab === 'simulation' && (
           <>
-            {/* Left Control Panel: Dam info, Breach inputs, Run button */}
+            {/* Left Control Panel */}
             <LeftPanel
               dam={selectedDam}
               parameters={parameters}
@@ -165,65 +285,96 @@ export default function App() {
               simulationProgress={simulationProgress}
             />
 
-            {/* Central Stage: 3D DEM Viewer or 2D GIS Map */}
-            <main className="flex-1 relative overflow-hidden bg-[#0a0a0c] dot-grid">
-              {/* Top-Left Floating Map Layers Switcher */}
+            {/* Central Stage */}
+            <main className="flex-1 relative overflow-hidden bg-slate-200 bg-dot-grid">
+              {/* Layers Switcher */}
               <LayersPanel layers={layers} onToggleLayer={handleToggleLayer} />
 
-              {/* Bottom-Right Floating Legend Panel */}
-              <LegendPanel layers={layers} />
+              {/* Legend Panel */}
+              <LegendPanel
+                layers={layers}
+                activeHydraulicLayer={activeHydraulicLayer}
+                onSelectHydraulicLayer={setActiveHydraulicLayer}
+              />
 
-              {/* 3D vs 2D Render Mode */}
+              {/* Scientific Debug Panel (Ctrl+Shift+D) */}
+              {showDebugPanel && (
+                <ScientificDebugPanel
+                  diagnostics={diagnostics ?? {}}
+                  isDemoMode={isDemoMode}
+                  currentFrame={currentFrame}
+                  simulationId={simResult.metadata.id}
+                  scenarioId={parameters.failure_type}
+                  peakDischarge={simResult.metadata.peak_discharge_m3s}
+                  maxFloodedArea={simResult.impact_summary.flooded_area_sqkm}
+                  metadata={simResult.metadata as unknown as Record<string, unknown>}
+                />
+              )}
+
+              {/* 2D vs 3D Render Mode */}
               <ErrorBoundary fallbackTitle="Map Viewer Recovery">
                 {viewMode === '3D' ? (
                   <ThreeTerrainViewer
-                    dem={NAGARJUNA_SAGAR_DEM}
+                    dem={activeDEM}
                     currentFrame={currentFrame}
                     maxDepthGrid={simResult.max_depth_grid}
                     maxVelocityGrid={simResult.max_velocity_grid}
                     arrivalTimeGrid={simResult.arrival_time_grid}
                     riskGrid={simResult.risk_grid}
-                    infrastructure={NAGARJUNA_INFRASTRUCTURE}
+                    infrastructure={simResult.updated_infrastructure}
                     layers={layers}
+                    activeHydraulicLayer={activeHydraulicLayer}
                     onSelectPoint={setSelectedPoint}
                   />
                 ) : (
                   <Leaflet2DMap
                     dam={selectedDam}
-                    dem={NAGARJUNA_SAGAR_DEM}
+                    dem={activeDEM}
                     currentFrame={currentFrame}
                     maxDepthGrid={simResult.max_depth_grid}
                     maxVelocityGrid={simResult.max_velocity_grid}
                     arrivalTimeGrid={simResult.arrival_time_grid}
                     riskGrid={simResult.risk_grid}
-                    infrastructure={NAGARJUNA_INFRASTRUCTURE}
-                    riverChannel={KRISHNA_RIVER_CHANNEL}
+                    infrastructure={simResult.updated_infrastructure}
+                    riverChannel={activeRiverChannel}
                     layers={layers}
+                    breachLocation={parameters.breach_location}
+                    activeHydraulicLayer={activeHydraulicLayer}
                     onSelectPoint={setSelectedPoint}
                   />
                 )}
               </ErrorBoundary>
+
+              {/* Demo badge on map */}
+              {isDemoMode && (
+                <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-900/80 border border-amber-500/60 rounded-full text-amber-300 text-[11px] font-bold backdrop-blur">
+                    ⚠ DEMO DATA — flood extent is NOT from ANUGA solver
+                  </div>
+                </div>
+              )}
             </main>
 
             {/* Right Telemetry & Inspection Panel */}
             <RightPanel
               currentFrame={currentFrame}
+              frames={simResult.frames}
               metadata={simResult.metadata}
               impactSummary={simResult.impact_summary}
+              infrastructure={simResult.updated_infrastructure}
               selectedPoint={selectedPoint}
               onClearPoint={() => setSelectedPoint(null)}
             />
           </>
         )}
 
-        {/* Dedicated Secondary Modules */}
         {activeTab === 'impact' && (
           <ErrorBoundary fallbackTitle="Impact Analysis Module Recovery">
             <ImpactAnalysisPage
               metadata={simResult.metadata}
               frames={simResult.frames}
               impactSummary={simResult.impact_summary}
-              infrastructure={NAGARJUNA_INFRASTRUCTURE}
+              infrastructure={simResult.updated_infrastructure}
             />
           </ErrorBoundary>
         )}
@@ -236,7 +387,7 @@ export default function App() {
                 setParameters(newParams);
                 setActiveTab('simulation');
                 setTimeout(() => {
-                  handleRunSimulation().catch((err) => console.error('Simulation error:', err));
+                  handleRunSimulation(newParams).catch((err) => console.error('Simulation error:', err));
                 }, 100);
               }}
             />
@@ -246,26 +397,14 @@ export default function App() {
         {activeTab === 'evacuation' && (
           <ErrorBoundary fallbackTitle="Evacuation Planning Module Recovery">
             <EvacuationPage
-              routes={NAGARJUNA_EVACUATION_ROUTES}
-              infrastructure={NAGARJUNA_INFRASTRUCTURE}
+              routes={activeEvacuationRoutes}
+              infrastructure={simResult.updated_infrastructure}
             />
-          </ErrorBoundary>
-        )}
-
-        {activeTab === 'cinematic' && (
-          <ErrorBoundary fallbackTitle="Cinematic Visualizer Module Recovery">
-            <CinematicViewPage />
-          </ErrorBoundary>
-        )}
-
-        {activeTab === 'admin' && (
-          <ErrorBoundary fallbackTitle="Admin Data Management Recovery">
-            <AdminDataPage />
           </ErrorBoundary>
         )}
       </div>
 
-      {/* Bottom Timeline Controls (Only visible in Simulation Studio) */}
+      {/* Bottom Timeline Controls */}
       {activeTab === 'simulation' && (
         <TimelineControls
           frames={simResult.frames}
@@ -281,6 +420,24 @@ export default function App() {
           onSpeedChange={setPlaybackSpeed}
         />
       )}
+
+      {/* AI Water Flow & Gate Control Modal */}
+      <AIFlowControlModal
+        isOpen={isAIAdvisorOpen}
+        onClose={() => setIsAIAdvisorOpen(false)}
+        dam={selectedDam}
+        parameters={parameters}
+        simResult={simResult}
+        onApplyAIParameters={(newParams) => {
+          const updated = { ...parameters, ...newParams };
+          setParameters(updated);
+          const updatedResult = runHydrodynamicSimulation(activeDEM, updated, activeInfrastructure);
+          setSimResult(updatedResult);
+          setCurrentFrameIndex(3);
+          setIsPlaying(true);
+          setIsDemoMode(true);
+        }}
+      />
     </div>
   );
 }

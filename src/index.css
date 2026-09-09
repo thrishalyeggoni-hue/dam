@@ -2,23 +2,69 @@
 
 @layer utilities {
   .bg-dot-grid {
-    background-image: radial-gradient(#222 1px, transparent 1px);
-    background-size: 24px 24px;
+    background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+    background-size: 20px 20px;
   }
 }
 
-/* Immersive Dark Theme subtle scrollbars */
+/* Professional Light Theme subtle scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a0c;
+  background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: #cbd5e1;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: #94a3b8;
+}
+
+/* Dynamic Hydrodynamic Water Wave Animations */
+@keyframes waterFlowDash {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -40;
+  }
+}
+
+.animated-water-flow {
+  animation: waterFlowDash 1.4s linear infinite;
+}
+
+@keyframes waterPulse {
+  0%, 100% {
+    fill-opacity: 0.42;
+  }
+  50% {
+    fill-opacity: 0.55;
+  }
+}
+
+.animated-water-polygon {
+  animation: waterPulse 3.5s ease-in-out infinite;
+}
+
+@keyframes pulseBeacon {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.pulsing-danger-beacon {
+  animation: pulseBeacon 1.5s infinite;
 }

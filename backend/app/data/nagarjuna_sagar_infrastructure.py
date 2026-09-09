@@ -1,0 +1,43 @@
+"""
+nagarjuna_sagar_infrastructure.py
+Python mirror of the TypeScript nagarjunaSagarInfrastructure.ts
+
+These are reference coordinates for infrastructure. The simulation will
+overwrite water_depth_m, arrival_time_min, etc. with solver-derived values.
+"""
+
+NAGARJUNA_INFRASTRUCTURE = [
+    {"id":"inf-v1","name":"Vijayapuri South (Right Bank Colony)","type":"village","lat":16.571,"lon":79.319,"elevation_m":118,"population":14500,"distance_from_dam_km":1.2,"river_bank":"right"},
+    {"id":"inf-v2","name":"Vijayapuri North (Hill Colony)","type":"village","lat":16.586,"lon":79.317,"elevation_m":165,"population":11200,"distance_from_dam_km":1.5,"river_bank":"left"},
+    {"id":"inf-v3","name":"Tail Pond Submersible Settlement","type":"village","lat":16.568,"lon":79.378,"elevation_m":86,"population":4300,"distance_from_dam_km":7.1,"river_bank":"right"},
+    {"id":"inf-v4","name":"Rayavaram Lowland Hamlet","type":"village","lat":16.562,"lon":79.421,"elevation_m":82,"population":3100,"distance_from_dam_km":11.8,"river_bank":"right"},
+    {"id":"inf-v5","name":"Macherla River Ward","type":"village","lat":16.518,"lon":79.435,"elevation_m":110,"population":26000,"distance_from_dam_km":16.4,"river_bank":"right"},
+    {"id":"inf-v6","name":"Rentachintala River Corridor","type":"village","lat":16.554,"lon":79.475,"elevation_m":78,"population":18500,"distance_from_dam_km":17.5,"river_bank":"right"},
+    {"id":"inf-h1","name":"Nagarjuna Sagar Area Hospital","type":"hospital","lat":16.573,"lon":79.324,"elevation_m":125,"population":120,"distance_from_dam_km":1.4},
+    {"id":"inf-h2","name":"Tail Pond Primary Health Centre","type":"hospital","lat":16.572,"lon":79.382,"elevation_m":92,"population":40,"distance_from_dam_km":7.5},
+    {"id":"inf-h3","name":"Rentachintala Community Health Centre","type":"hospital","lat":16.558,"lon":79.472,"elevation_m":85,"population":60,"distance_from_dam_km":17.2},
+    {"id":"inf-s1","name":"Kendriya Vidyalaya Nagarjuna Sagar","type":"school","lat":16.581,"lon":79.321,"elevation_m":142,"population":850,"distance_from_dam_km":1.1},
+    {"id":"inf-s2","name":"Zilla Parishad High School Vijayapuri","type":"school","lat":16.568,"lon":79.325,"elevation_m":112,"population":620,"distance_from_dam_km":1.6},
+    {"id":"inf-s3","name":"Rentachintala Govt Junior College","type":"school","lat":16.552,"lon":79.471,"elevation_m":88,"population":540,"distance_from_dam_km":17.1},
+    {"id":"inf-b1","name":"Krishna Gorge Road Bridge","type":"bridge","lat":16.571,"lon":79.376,"elevation_m":88,"distance_from_dam_km":6.9},
+    {"id":"inf-b2","name":"NH-565 Krishna River Viaduct","type":"bridge","lat":16.566,"lon":79.412,"elevation_m":84,"distance_from_dam_km":10.7},
+    {"id":"inf-b3","name":"Rentachintala Causeway","type":"bridge","lat":16.556,"lon":79.468,"elevation_m":76,"distance_from_dam_km":16.8},
+    {"id":"inf-sh1","name":"Nalgonda North Plateau Emergency Shelter","type":"shelter","lat":16.612,"lon":79.318,"elevation_m":280,"population":5000,"distance_from_dam_km":4.2},
+    {"id":"inf-sh2","name":"Pylon Ridge High-Ground Evacuation Complex","type":"shelter","lat":16.561,"lon":79.308,"elevation_m":235,"population":8000,"distance_from_dam_km":2.1},
+    {"id":"inf-sh3","name":"Macherla Fort Ridge Safe Zone","type":"shelter","lat":16.495,"lon":79.428,"elevation_m":220,"population":15000,"distance_from_dam_km":14.5},
+]
+
+KRISHNA_RIVER_CHANNEL = [
+    [16.5772, 79.255], [16.5772, 79.29], [16.5772, 79.3134],
+    [16.574, 79.33], [16.571, 79.355], [16.568, 79.378],
+    [16.566, 79.405], [16.563, 79.428], [16.56, 79.452],
+    [16.555, 79.475], [16.55, 79.485],
+]
+
+EVACUATION_ROUTES = [
+    {"id":"evac-1","from_village":"Vijayapuri South","to_shelter":"Pylon Ridge Complex","distance_km":3.4,"travel_time_min":14,"status":"SAFE","min_clearance_elevation_m":135,"coordinates":[[16.571,79.319],[16.568,79.314],[16.564,79.31],[16.561,79.308]]},
+    {"id":"evac-2","from_village":"Vijayapuri North","to_shelter":"Nalgonda North Shelter","distance_km":4.8,"travel_time_min":19,"status":"SAFE","min_clearance_elevation_m":185,"coordinates":[[16.586,79.317],[16.595,79.316],[16.605,79.317],[16.612,79.318]]},
+    {"id":"evac-3","from_village":"Tail Pond Settlement","to_shelter":"Pylon Ridge Complex","distance_km":8.9,"travel_time_min":32,"status":"CAUTION","min_clearance_elevation_m":98,"coordinates":[[16.568,79.378],[16.562,79.355],[16.558,79.328],[16.561,79.308]]},
+    {"id":"evac-4","from_village":"Rayavaram Hamlet","to_shelter":"Macherla Fort Shelter","distance_km":9.6,"travel_time_min":38,"status":"SAFE","min_clearance_elevation_m":110,"coordinates":[[16.562,79.421],[16.545,79.423],[16.52,79.426],[16.495,79.428]]},
+    {"id":"evac-5","from_village":"Rentachintala River Corridor","to_shelter":"Macherla Fort Shelter","distance_km":12.2,"travel_time_min":46,"status":"SAFE","min_clearance_elevation_m":88,"coordinates":[[16.554,79.475],[16.538,79.46],[16.512,79.44],[16.495,79.428]]},
+]

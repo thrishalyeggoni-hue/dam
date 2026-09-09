@@ -10,6 +10,7 @@ export const NAGARJUNA_INFRASTRUCTURE: InfrastructureFeature[] = [
     elevation_m: 118,
     population: 14500,
     distance_from_dam_km: 1.2,
+    river_bank: 'right',
   },
   {
     id: 'inf-v2',
@@ -20,6 +21,7 @@ export const NAGARJUNA_INFRASTRUCTURE: InfrastructureFeature[] = [
     elevation_m: 165,
     population: 11200,
     distance_from_dam_km: 1.5,
+    river_bank: 'left',
   },
   {
     id: 'inf-v3',
@@ -30,6 +32,7 @@ export const NAGARJUNA_INFRASTRUCTURE: InfrastructureFeature[] = [
     elevation_m: 86,
     population: 4300,
     distance_from_dam_km: 7.1,
+    river_bank: 'right',
   },
   {
     id: 'inf-v4',
@@ -40,6 +43,7 @@ export const NAGARJUNA_INFRASTRUCTURE: InfrastructureFeature[] = [
     elevation_m: 82,
     population: 3100,
     distance_from_dam_km: 11.8,
+    river_bank: 'right',
   },
   {
     id: 'inf-v5',
@@ -50,6 +54,7 @@ export const NAGARJUNA_INFRASTRUCTURE: InfrastructureFeature[] = [
     elevation_m: 110,
     population: 26000,
     distance_from_dam_km: 16.4,
+    river_bank: 'right',
   },
   {
     id: 'inf-v6',
@@ -60,6 +65,7 @@ export const NAGARJUNA_INFRASTRUCTURE: InfrastructureFeature[] = [
     elevation_m: 78,
     population: 18500,
     distance_from_dam_km: 17.5,
+    river_bank: 'right',
   },
   {
     id: 'inf-h1',

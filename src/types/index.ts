@@ -1,4 +1,4 @@
-export type FailureType = 'partial' | 'major' | 'complete' | 'custom';
+export type FailureType = 'partial' | 'major' | 'complete' | 'custom' | 'piping';
 
 export interface IndianDam {
   id: string;
@@ -71,6 +71,10 @@ export interface SimulationFrame {
   grid_depths: number[][]; // 2D matrix of depths in metres
   grid_velocities: [number, number][][]; // [u, v]
   active_cells_count: number;
+  max_stage_m?: number;
+  flood_geojson?: any;
+  wet_cell_count?: number;
+  dry_cell_count?: number;
 }
 
 export interface SimulationMetadata {
@@ -123,6 +127,7 @@ export interface InfrastructureFeature {
   elevation_m: number;
   population?: number;
   distance_from_dam_km: number;
+  river_bank?: 'left' | 'right' | 'center';
   // Dynamic simulation values
   water_depth_m?: number;
   arrival_time_min?: number;
@@ -153,6 +158,8 @@ export interface EvacuationRoute {
   status: 'SAFE' | 'CAUTION' | 'FLOODED';
   coordinates: [number, number][];
   min_clearance_elevation_m: number;
+  corridor_name?: string;
+  road_type?: string;
 }
 
 export interface ScenarioComparisonData {

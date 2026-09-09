@@ -1,16 +1,11 @@
 import React from 'react';
 import {
   ShieldAlert,
-  Building,
   Home,
   HeartPulse,
   GraduationCap,
-  Waves,
   Route,
-  Users,
   AlertTriangle,
-  FileSpreadsheet,
-  Download,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -22,20 +17,11 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
 } from 'recharts';
-import {
-  SimulationFrame,
-  SimulationMetadata,
-  ImpactStatistics,
-  InfrastructureFeature,
-} from '../types';
+import { SimulationMetadata, SimulationFrame, ImpactStatistics, InfrastructureFeature } from '../types';
 
 interface ImpactAnalysisPageProps {
-  metadata?: SimulationMetadata;
+  metadata: SimulationMetadata;
   frames: SimulationFrame[];
   impactSummary: ImpactStatistics;
   infrastructure: InfrastructureFeature[];
@@ -47,166 +33,144 @@ export const ImpactAnalysisPage: React.FC<ImpactAnalysisPageProps> = ({
   impactSummary,
   infrastructure,
 }) => {
-  // Chart data: Flooded Area & Discharge vs Time
+  const totalVillages = infrastructure.filter((f) => f.type === 'village').length;
+  const totalHospitals = infrastructure.filter((f) => f.type === 'hospital').length;
+  const totalSchools = infrastructure.filter((f) => f.type === 'school').length;
+  const totalBridges = infrastructure.filter((f) => f.type === 'bridge').length;
+
   const timeSeriesData = frames.map((f) => ({
-    time: f.time_formatted.substring(0, 5),
+    time: f.time_formatted,
     discharge: f.discharge_m3s,
+    stage: f.max_stage_m,
     floodedArea: f.flooded_area_sqkm,
-    maxDepth: f.max_depth_m,
-    maxVelocity: f.max_velocity_ms,
   }));
 
-  // Hazard breakdown data
-  const hazardData = [
-    { name: 'Low Hazard (<0.3)', value: 35, color: '#10b981' },
-    { name: 'Moderate (0.3-0.6)', value: 25, color: '#f59e0b' },
-    { name: 'High (0.6-1.2)', value: 22, color: '#f97316' },
-    { name: 'Very High (≥1.2)', value: 18, color: '#ef4444' },
-  ];
-
-  // Sector Exposure bar chart data
-  const sectorData = [
-    { name: 'Villages', affected: impactSummary.villages_inundated, total: 6 },
-    { name: 'Hospitals', affected: impactSummary.hospitals_inundated, total: 3 },
-    { name: 'Schools', affected: impactSummary.schools_inundated, total: 3 },
-    { name: 'Bridges', affected: impactSummary.bridges_inundated, total: 3 },
+  const infrastructureBreakdown = [
+    { name: 'Villages', inundated: impactSummary.villages_inundated, total: Math.max(1, totalVillages) },
+    { name: 'Hospitals', inundated: impactSummary.hospitals_inundated, total: Math.max(1, totalHospitals) },
+    { name: 'Schools', inundated: impactSummary.schools_inundated, total: Math.max(1, totalSchools) },
+    { name: 'Bridges', inundated: impactSummary.bridges_inundated, total: Math.max(1, totalBridges) },
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#0a0a0c] p-6 text-[#e0e0e0]">
+    <div className="flex-1 overflow-y-auto bg-slate-50 p-6 text-slate-800">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Page Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
-          <div>
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-rose-400" />
-              <h2 className="text-lg font-black tracking-wider uppercase text-white">
-                Downstream Infrastructure Impact &amp; Consequence Assessment
-              </h2>
-            </div>
-            <p className="text-xs text-white/40 mt-1 font-mono">
-              GIS Intersection between Hydrodynamic Inundation Envelopes and Real Downstream Krishna Basin Infrastructure
+        {/* Executive Advisory Banner */}
+        <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-start gap-3 text-red-900 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-red-800">
+              NDMA Priority 1 Directive &mdash; Downstream Flood Exposure
+            </h2>
+            <p className="text-xs text-red-700 leading-relaxed">
+              Hydrodynamic Saint-Venant 2D simulation indicates peak outflow of{' '}
+              <b>{metadata.peak_discharge_m3s.toLocaleString()} m³/s</b> with an estimated{' '}
+              <b>{impactSummary.flooded_area_sqkm} km²</b> of downstream valley inundation. Immediate evacuation clearance is required along the river corridor.
             </p>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <span className="text-xs px-2.5 py-1 rounded bg-white/5 border border-white/10 text-white/70 font-mono">
-              Scenario: {metadata?.parameters.failure_type.toUpperCase()} BREACH ({metadata?.parameters.breach_width_m}m)
-            </span>
-          </div>
         </div>
 
-        {/* Primary Impact Metrics KPI Grid */}
+        {/* Top KPI Metrics Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white/5 p-3.5 rounded border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] text-white/40 uppercase tracking-widest block font-bold">Flooded Valley Area</span>
-            <div className="text-2xl font-mono font-bold text-blue-400 my-1">
-              {impactSummary.flooded_area_sqkm} <span className="text-xs text-white/40 font-normal">km²</span>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Peak Outflow</span>
+            <div className="text-2xl font-mono font-bold text-slate-900 my-1">
+              {metadata.peak_discharge_m3s.toLocaleString()} <span className="text-xs text-slate-400 font-normal">m³/s</span>
             </div>
-            <span className="text-[10px] text-white/30 font-mono">Total inundation footprint</span>
+            <span className="text-[10px] text-slate-500 font-mono">Froehlich formulation</span>
           </div>
 
-          <div className="bg-white/5 p-3.5 rounded border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] text-white/40 uppercase tracking-widest block font-bold">Buildings Affected</span>
-            <div className="text-2xl font-mono font-bold text-amber-400 my-1">
-              {impactSummary.buildings_affected.toLocaleString()}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Inundated Footprint</span>
+            <div className="text-2xl font-mono font-bold text-amber-600 my-1">
+              {impactSummary.flooded_area_sqkm} <span className="text-xs text-slate-400 font-normal">km²</span>
             </div>
-            <span className="text-[10px] text-white/30 font-mono">Residential &amp; commercial</span>
+            <span className="text-[10px] text-slate-500">2D SWE inundation envelope</span>
           </div>
 
-          <div className="bg-white/5 p-3.5 rounded border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] text-white/40 uppercase tracking-widest block font-bold">Roads Submerged</span>
-            <div className="text-2xl font-mono font-bold text-blue-300 my-1">
-              {impactSummary.roads_affected_km} <span className="text-xs text-white/40 font-normal">km</span>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Corridor Highway</span>
+            <div className="text-2xl font-mono font-bold text-blue-600 my-1">
+              {impactSummary.roads_affected_km} <span className="text-xs text-slate-400 font-normal">km</span>
             </div>
-            <span className="text-[10px] text-white/30 font-mono">NH-565 &amp; State Corridors</span>
+            <span className="text-[10px] text-slate-500">Inundated valley routes</span>
           </div>
 
-          <div className="bg-white/5 p-3.5 rounded border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] text-white/40 uppercase tracking-widest block font-bold">Inundated Villages</span>
-            <div className="text-2xl font-mono font-bold text-rose-400 my-1">
-              {impactSummary.villages_inundated} <span className="text-xs text-white/40 font-normal">/ 6</span>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Inundated Villages</span>
+            <div className="text-2xl font-mono font-bold text-rose-600 my-1">
+              {impactSummary.villages_inundated} <span className="text-xs text-slate-400 font-normal">/ {totalVillages}</span>
             </div>
-            <span className="text-[10px] text-white/30 font-mono">Directly in flood pathway</span>
+            <span className="text-[10px] text-slate-500">Directly in flood pathway</span>
           </div>
 
-          <div className="bg-white/5 p-3.5 rounded border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] text-white/40 uppercase tracking-widest block font-bold">Medical Facilities</span>
-            <div className="text-2xl font-mono font-bold text-red-400 my-1">
-              {impactSummary.hospitals_inundated} <span className="text-xs text-white/40 font-normal">/ 3</span>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Medical Centers</span>
+            <div className="text-2xl font-mono font-bold text-red-600 my-1">
+              {impactSummary.hospitals_inundated} <span className="text-xs text-slate-400 font-normal">/ {Math.max(1, totalHospitals)}</span>
             </div>
-            <span className="text-[10px] text-white/30 font-mono">PHCs &amp; Area Hospital</span>
+            <span className="text-[10px] text-slate-500">PHCs &amp; area hospitals</span>
           </div>
 
-          <div className="bg-white/5 p-3.5 rounded border border-white/10 flex flex-col justify-between">
-            <span className="text-[10px] text-white/40 uppercase tracking-widest block font-bold">Est. Population</span>
-            <div className="text-2xl font-mono font-bold text-purple-400 my-1">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Exposed Population</span>
+            <div className="text-2xl font-mono font-bold text-purple-600 my-1">
               {impactSummary.population_exposed_estimate.toLocaleString()}
             </div>
-            <span className="text-[10px] text-white/30 font-mono">Settlement census estimate</span>
+            <span className="text-[10px] text-slate-500">Census aggregate</span>
           </div>
-        </div>
-
-        {/* Population Exposure Notice */}
-        <div className="bg-white/5 border border-white/10 p-3 rounded flex items-center space-x-3 text-xs text-white/50 font-mono">
-          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-          <p>
-            <strong className="text-white">Population Exposure Protocol:</strong> Official micro-level census data is used where available. Where individual building occupancy is unverified, values reflect aggregate settlement populations within the hydrodynamic flood envelope. No artificial population counts are fabricated.
-          </p>
         </div>
 
         {/* Dynamic Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Discharge and Inundation Area vs Time */}
-          <div className="bg-white/5 p-4 rounded border border-white/10">
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-white">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
                 Flood Hydrograph &amp; Inundated Area Progression
               </h3>
-              <span className="text-[10px] text-white/40 font-mono">Time Steps (15m)</span>
+              <span className="text-[10px] text-slate-500 font-mono">30 continuous frames</span>
             </div>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={timeSeriesData}>
                   <defs>
                     <linearGradient id="colorQ" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.6} />
+                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0.0} />
                     </linearGradient>
                     <linearGradient id="colorArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#0284c7" stopOpacity={0.6} />
+                      <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                  <XAxis dataKey="time" stroke="#666" tick={{ fontSize: 10, fill: '#888' }} />
-                  <YAxis yAxisId="left" stroke="#3b82f6" tick={{ fontSize: 10, fill: '#3b82f6' }} label={{ value: 'Discharge (m³/s)', angle: -90, position: 'insideLeft', fill: '#3b82f6', fontSize: 10 }} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#06b6d4" tick={{ fontSize: 10, fill: '#06b6d4' }} label={{ value: 'Inundated (km²)', angle: 90, position: 'insideRight', fill: '#06b6d4', fontSize: 10 }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0a0a0c', borderColor: 'rgba(255,255,255,0.1)', fontSize: '11px', borderRadius: '4px' }} />
-                  <Area yAxisId="left" type="monotone" dataKey="discharge" stroke="#3b82f6" fillOpacity={1} fill="url(#colorQ)" name="Breach Discharge (m³/s)" />
-                  <Area yAxisId="right" type="monotone" dataKey="floodedArea" stroke="#06b6d4" fillOpacity={1} fill="url(#colorArea)" name="Inundated Area (km²)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="time" stroke="#94a3b8" tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <YAxis yAxisId="left" stroke="#2563eb" tick={{ fontSize: 10, fill: '#2563eb' }} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#0284c7" tick={{ fontSize: 10, fill: '#0284c7' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', fontSize: '11px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+                  <Area yAxisId="left" type="monotone" dataKey="discharge" stroke="#2563eb" strokeWidth={2} fillOpacity={1} fill="url(#colorQ)" name="Breach Outflow (m³/s)" />
+                  <Area yAxisId="right" type="monotone" dataKey="floodedArea" stroke="#0284c7" strokeWidth={2} fillOpacity={1} fill="url(#colorArea)" name="Inundated Area (km²)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Critical Infrastructure Exposure by Type */}
-          <div className="bg-white/5 p-4 rounded border border-white/10">
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-white">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
                 Critical Infrastructure Exposure Breakdown
               </h3>
-              <span className="text-[10px] text-white/40 font-mono">Intersecting Assets</span>
+              <span className="text-[10px] text-slate-500 font-mono">Inundation Ratio</span>
             </div>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sectorData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                  <XAxis dataKey="name" stroke="#666" tick={{ fontSize: 10, fill: '#888' }} />
-                  <YAxis stroke="#666" tick={{ fontSize: 10, fill: '#888' }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0a0a0c', borderColor: 'rgba(255,255,255,0.1)', fontSize: '11px', borderRadius: '4px' }} />
-                  <Bar dataKey="affected" fill="#ef4444" name="Impacted / Inundated" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="total" fill="#262626" name="Total in District" radius={[2, 2, 0, 0]} />
+                <BarChart data={infrastructureBreakdown}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', fontSize: '11px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+                  <Bar dataKey="inundated" fill="#ef4444" name="Inundated Asset" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="total" fill="#cbd5e1" name="Total in Reach" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -214,87 +178,89 @@ export const ImpactAnalysisPage: React.FC<ImpactAnalysisPageProps> = ({
         </div>
 
         {/* Affected Settlements Detailed Table */}
-        <div className="bg-white/5 rounded border border-white/10 overflow-hidden">
-          <div className="p-4 border-b border-white/10 flex items-center justify-between">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
             <div className="flex items-center gap-2">
-              <Home className="w-4 h-4 text-blue-400" />
-              <h3 className="text-xs font-bold uppercase tracking-widest text-white">
+              <Home className="w-4 h-4 text-blue-600" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
                 Downstream Settlements Hydrodynamic Exposure Register
               </h3>
             </div>
-            <span className="text-[10px] text-white/40 font-mono">
-              6 Monitored Settlements across Krishna Gorge
+            <span className="text-[10px] text-slate-500 font-mono">
+              {infrastructure.length} Monitored Assets across Downstream Reach
             </span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-white/5 text-white/40 font-mono uppercase text-[10px] tracking-wider border-b border-white/10">
+              <thead className="bg-slate-50 text-slate-500 font-mono uppercase text-[10px] tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="p-3">Settlement Name</th>
                   <th className="p-3">Type</th>
                   <th className="p-3">Dist. from Dam</th>
                   <th className="p-3">Ground Elev.</th>
                   <th className="p-3">Flood Arrival</th>
-                  <th className="p-3">Max Stage Depth</th>
+                  <th className="p-3">Max Water Depth</th>
                   <th className="p-3">Peak Velocity</th>
                   <th className="p-3">Hazard Category</th>
-                  <th className="p-3">Status</th>
+                  <th className="p-3">Evacuation Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 font-mono">
-                {infrastructure.map((feat) => (
-                  <tr key={feat.id} className="hover:bg-white/5 transition-colors">
-                    <td className="p-3 font-bold text-white flex items-center gap-2">
-                      {feat.type === 'village' && <Home className="w-3.5 h-3.5 text-amber-400" />}
-                      {feat.type === 'hospital' && <HeartPulse className="w-3.5 h-3.5 text-red-400" />}
-                      {feat.type === 'school' && <GraduationCap className="w-3.5 h-3.5 text-indigo-400" />}
-                      {feat.type === 'bridge' && <Route className="w-3.5 h-3.5 text-cyan-400" />}
-                      {feat.type === 'shelter' && <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />}
-                      <span>{feat.name}</span>
-                    </td>
-                    <td className="p-3 text-white/70 uppercase text-[10px]">{feat.type}</td>
-                    <td className="p-3 text-white/70">{feat.distance_from_dam_km} km</td>
-                    <td className="p-3 text-white/70">{feat.elevation_m} m</td>
-                    <td className="p-3 text-emerald-400 font-bold">
-                      {feat.arrival_time_min !== undefined ? `${feat.arrival_time_min} min` : 'Dry'}
-                    </td>
-                    <td className="p-3 text-blue-400 font-bold">
-                      {feat.max_depth_m !== undefined ? `${feat.max_depth_m.toFixed(1)} m` : '0.0 m'}
-                    </td>
-                    <td className="p-3 text-amber-300">
-                      {feat.max_velocity_ms !== undefined ? `${feat.max_velocity_ms.toFixed(1)} m/s` : '0.0 m/s'}
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          feat.risk_level === 'VERY_HIGH'
-                            ? 'bg-rose-950 text-rose-300 border border-rose-600'
-                            : feat.risk_level === 'HIGH'
-                            ? 'bg-amber-950 text-amber-300 border border-amber-600'
-                            : feat.risk_level === 'MODERATE'
-                            ? 'bg-yellow-950 text-yellow-300 border border-yellow-600'
-                            : 'bg-emerald-950 text-emerald-300 border border-emerald-600'
-                        }`}
-                      >
-                        {feat.risk_level || 'SAFE'}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                          feat.evacuation_status === 'INUNDATED'
-                            ? 'bg-rose-900/60 text-rose-200'
-                            : feat.evacuation_status === 'AT_RISK'
-                            ? 'bg-amber-900/60 text-amber-200'
-                            : 'bg-emerald-900/60 text-emerald-200'
-                        }`}
-                      >
-                        {feat.evacuation_status || 'ACCESSIBLE'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-slate-100">
+                {infrastructure.map((feat) => {
+                  const isFlooded = (feat.water_depth_m || 0) > 0.2;
+
+                  return (
+                    <tr key={feat.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-3 font-semibold text-slate-900 flex items-center gap-2">
+                        {feat.type === 'village' && <Home className="w-3.5 h-3.5 text-amber-600" />}
+                        {feat.type === 'hospital' && <HeartPulse className="w-3.5 h-3.5 text-red-600" />}
+                        {feat.type === 'school' && <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />}
+                        {feat.type === 'bridge' && <Route className="w-3.5 h-3.5 text-blue-600" />}
+                        {feat.type === 'shelter' && <ShieldAlert className="w-3.5 h-3.5 text-emerald-600" />}
+                        <span>{feat.name}</span>
+                      </td>
+                      <td className="p-3 text-slate-500 uppercase text-[10px] font-mono">{feat.type}</td>
+                      <td className="p-3 text-slate-600 font-mono">{feat.distance_from_dam_km} km</td>
+                      <td className="p-3 text-slate-600 font-mono">{feat.elevation_m} m</td>
+                      <td className={`p-3 font-mono font-bold ${isFlooded ? 'text-amber-700' : 'text-emerald-700'}`}>
+                        {isFlooded && feat.arrival_time_min !== undefined ? `T+${feat.arrival_time_min} mins` : 'Safe / Dry'}
+                      </td>
+                      <td className={`p-3 font-mono font-bold ${isFlooded ? 'text-blue-700' : 'text-slate-400'}`}>
+                        {feat.max_depth_m !== undefined && feat.max_depth_m > 0 ? `${feat.max_depth_m.toFixed(1)} m` : '0.0 m'}
+                      </td>
+                      <td className="p-3 text-slate-700 font-mono">
+                        {feat.max_velocity_ms !== undefined && feat.max_velocity_ms > 0 ? `${feat.max_velocity_ms.toFixed(1)} m/s` : '0.0 m/s'}
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${feat.risk_level === 'VERY_HIGH'
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                              : feat.risk_level === 'HIGH'
+                                ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                                : feat.risk_level === 'MODERATE'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            }`}
+                        >
+                          {feat.risk_level || 'SAFE'}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-semibold ${feat.evacuation_status === 'INUNDATED'
+                              ? 'bg-red-100 text-red-800 border border-red-200'
+                              : feat.evacuation_status === 'AT_RISK'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            }`}
+                        >
+                          {feat.evacuation_status || 'ACCESSIBLE'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
